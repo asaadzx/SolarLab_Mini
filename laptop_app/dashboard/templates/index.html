@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SolarLab Mini Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>SolarLab Mini</h1>
+    <div class="cards">
+        <div class="card">Voltage: <span id="v">-</span> V</div>
+        <div class="card">Current: <span id="i">-</span> A</div>
+        <div class="card">Power: <span id="p">-</span> W</div>
+    </div>
+    <canvas id="chart" width="400" height="200"></canvas>
+    <script>
+        const ctx = document.getElementById('chart');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Power (W)', data: [], borderWidth: 1 }] },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+        async function update() {
+            try {
+                const res = await fetch('/api/latest');
+                const j = await res.json();
+                document.getElementById('v').textContent = j.voltage;
+                document.getElementById('i').textContent = j.current;
+                document.getElementById('p').textContent = j.power;
+                const t = new Date().toLocaleTimeString();
+                chart.data.labels.push(t);
+                chart.data.datasets[0].data.push(j.power);
+                if (chart.data.labels.length > 60) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+                chart.update();
+            } catch(e) {}
+        }
+        setInterval(update, 1000);
+        update();
+    </script>
+</body>
+</html>
