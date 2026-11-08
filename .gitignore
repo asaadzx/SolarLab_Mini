@@ -8,3 +8,12 @@
 get-platformio.py
 firmware.zip
 test_wifi/.pio/
+
+# Deploy cache
+.cache/
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

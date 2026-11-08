@@ -16,6 +16,39 @@ Low-cost plug-and-play solar panel monitoring system using ESP32-WROOM, INA219, 
 3. Power via USB, ESP32 creates AP `SolarLab-Mini` (password `solarlab123`)
 4. Connect to AP, visit `http://192.168.4.1` or poll `/data` for JSON
 
+## Flash & deploy (MicroPython)
+
+Requires Python 3 and the deploy tools:
+
+```bash
+pip install esptool mpremote
+```
+
+Connect the ESP32 with a **data** USB cable, then run:
+
+```bash
+./deploy.py
+```
+
+The CLI scans serial ports, marks known ESP32 adapters (`CP210x`, `CH340`,
+`Espressif USB`, `FTDI`), and asks you to select one. It then erases the flash,
+installs MicroPython v1.29.0, uploads `firmware/`, and resets the board.
+
+Useful options:
+
+```bash
+./deploy.py --list        # only scan and print ports
+./deploy.py --keep-files  # update files without erasing flash
+./deploy.py --monitor     # open the REPL when done
+./deploy.py --yes         # skip the erase confirmation
+```
+
+If no port appears on Linux, add your user to the serial group and log in again:
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
 ## Wiring (I2C)
 - VCC: 3.3V
 - GND: common
