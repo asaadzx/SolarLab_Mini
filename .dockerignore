@@ -1,0 +1,14 @@
+.git
+.worktrees
+laptop_app/.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+laptop_app/dashboard/data
+firmware
+firmware_pio
+src
+include
+test_wifi
+.cache
+team knowledge/Team Knowledge.docx

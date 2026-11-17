@@ -1,0 +1,18 @@
+services:
+  dashboard:
+    build: .
+    image: solarball-mini-dashboard
+    container_name: solarball-mini-dashboard
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      ESP_URL: "${ESP_URL:-http://192.168.4.1/data}" # Sensor endpoint, overrideable for stub tests
+      SOLARLAB_DB_PATH: /app/data/solarlab.sqlite3 # SQLite file inside the named volume
+      SOLARLAB_LOG_PATH: /app/data/app.log # Rotating log inside the named volume
+      HOST: 0.0.0.0 # Bind all host interfaces under host networking
+      PORT: "5000" # Dashboard port
+    volumes:
+      - solarlab-data:/app/data # Persistent DB and logs
+
+volumes:
+  solarlab-data:

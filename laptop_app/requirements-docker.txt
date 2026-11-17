@@ -1,0 +1,3 @@
+# Container runtime dependencies only; pandas is not needed by the dashboard.
+flask
+requests
