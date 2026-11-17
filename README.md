@@ -1,79 +1,109 @@
 # SolarLab Mini
 
-Low-cost plug-and-play solar panel monitoring system using ESP32-WROOM, INA219, and SSD1306 OLED.
+Low-cost solar panel monitoring system: an ESP32 reads a solar panel's voltage and
+current with an INA219, shows the values on an OLED, and serves them as JSON over
+its own Wi-Fi access point. A small Flask dashboard on a laptop can plot them live.
+
+**The active implementation is the MicroPython firmware in `firmware/`.** The
+PlatformIO/Arduino folders (`src/`, `include/`, `firmware_pio/`, `test_wifi/`) are
+earlier experiments kept for reference.
 
 ## Hardware
-- ESP32-WROOM-32 DevKit
-- INA219 Current/Voltage Sensor (I2C 0x40)
-- 0.96" SSD1306 OLED (I2C 0x3C)
-- 10W 18V Solar Panel
-- Inline fuse (1A/2A) on panel +
-- Breadboard, wires, multimeter
 
-## Firmware (MicroPython)
-1. Flash MicroPython to ESP32-WROOM
-2. Upload `firmware/` contents to ESP32 (e.g., with Thonny or ampy)
-3. Power via USB, ESP32 creates AP `SolarLab-Mini` (password `solarlab123`)
-4. Connect to AP, visit `http://192.168.4.1` or poll `/data` for JSON
+- ESP32-WROOM-32 DevKit (MicroPython v1.29.0)
+- INA219 current/voltage sensor, I2C address `0x40`
+- 0.96" SSD1306 OLED, I2C address `0x3C`
+- Small solar panel (keep open-circuit voltage below 26 V)
+- Inline DC fuse on the panel's positive wire
+- USB cable to power the ESP32 during development
 
-## Flash & deploy (MicroPython)
+### Verified wiring (two separate I2C buses)
 
-Requires Python 3 and the deploy tools:
+| Signal | OLED (SSD1306) | INA219 |
+|---|---|---|
+| VCC | 3V3 | 3V3 |
+| GND | common ground | common ground |
+| SDA | GPIO23 | GPIO19 |
+| SCL | GPIO21 | GPIO18 |
+| I2C bus | I2C(0) | I2C(1) |
+
+Power loop and common-ground details are in [docs/wiring.md](docs/wiring.md).
+
+## Flash and deploy
+
+Requires Python 3, `esptool`, `mpremote`, and `pyserial`:
 
 ```bash
-pip install esptool mpremote
-```
-
-Connect the ESP32 with a **data** USB cable, then run:
-
-```bash
+pip install esptool mpremote pyserial
 ./deploy.py
 ```
 
-The CLI scans serial ports, marks known ESP32 adapters (`CP210x`, `CH340`,
-`Espressif USB`, `FTDI`), and asks you to select one. It then erases the flash,
-installs MicroPython v1.29.0, uploads `firmware/`, and resets the board.
-
-Useful options:
+The CLI scans serial ports, highlights known ESP32 adapters, asks which one to use,
+erases the flash, installs MicroPython, uploads `firmware/`, and resets the board.
 
 ```bash
-./deploy.py --list        # only scan and print ports
-./deploy.py --keep-files  # update files without erasing flash
-./deploy.py --monitor     # open the REPL when done
-./deploy.py --yes         # skip the erase confirmation
+./deploy.py --list         # list serial ports only
+./deploy.py --keep-files   # update files without erasing
+./deploy.py --port /dev/ttyUSB0 --yes
+./deploy.py --monitor      # open the REPL after deploying
 ```
 
-If no port appears on Linux, add your user to the serial group and log in again:
+On Linux, if your user cannot open the serial port, add yourself to the serial group
+and log in again (the group may be `dialout` or `uucp` depending on the adapter):
 
 ```bash
 sudo usermod -aG dialout $USER
 ```
 
-## Wiring (I2C)
-- VCC: 3.3V
-- GND: common
-- SDA: GPIO21
-- SCL: GPIO22
-- Solar panel + through fuse to INA219 VIN+, - to GND
+## Wi-Fi and data
 
-## Laptop App
+After boot the ESP32 creates:
+
+- SSID: `SolarLab-Mini`
+- Password: `solarlab123`
+- JSON endpoint: `http://192.168.4.1/data`
+
+Example response:
+
+```json
+{"voltage": 4.536, "current": 0.125, "power": 0.567, "timestamp": 1234}
+```
+
+Join this network on the laptop (or open the URL on a phone) to reach the board.
+The laptop will not have internet access while joined to the ESP32 AP.
+
+## Laptop app
+
 ```bash
 cd laptop_app
 pip install -r requirements.txt
-# Log data
+
+# Live dashboard (http://127.0.0.1:5000)
+python dashboard/app.py
+
+# CSV logger -> data/exports/solarlab_<timestamp>.csv
 python receiver_http.py
-# Dashboard
-cd dashboard
-python app.py
-# Open http://127.0.0.1:5000
 ```
 
-## Safety
-- Always use fuse on solar input
-- Common ground between all modules
-- Power ESP32 via USB during testing
-- Verify with multimeter
-- Start with short outdoor tests
+Both scripts read `http://192.168.4.1/data`, so the laptop must be on the
+`SolarLab-Mini` network.
 
-## Repo
-This is designed to be plug-and-play - clone, follow README, flash and go.
+## Tests
+
+```bash
+python -m pytest tests/ -q
+```
+
+Covers the deploy CLI, INA219 register scaling, webserver socket behavior, and the
+dashboard routes (dashboard tests need Flask installed).
+
+## Safety
+
+- Always put a correctly rated DC fuse in series on the panel's positive wire.
+- Panel (−), load (−), INA219 GND, and ESP32 GND must share one common ground.
+- Never feed the panel into the ESP32's 3V3 pin or a GPIO.
+- Keep panel voltage below 26 V and load current below 3.2 A (INA219 shunt limit).
+- A battery needs a chemistry-matched charge controller; never connect it directly.
+- Small motors draw far more than a small panel can supply and collapse the voltage.
+
+A beginner-friendly onboarding guide is in [`team knowledge/README.md`](team%20knowledge/README.md).
