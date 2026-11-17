@@ -40,6 +40,7 @@
     <script>
         // Each chart is created once and updated with fresh rows every second.
         function makeChart(canvasId, label, color) {
+            // 2D drawing context for this chart's canvas.
             const ctx = document.getElementById(canvasId).getContext('2d');
             return new Chart(ctx, {
                 type: 'line',
@@ -51,13 +52,18 @@
             });
         }
 
+        // Chart instance for the voltage series.
         const voltageChart = makeChart('voltage-chart', 'Voltage (V)', '#1f77b4');
+        // Chart instance for the current series.
         const currentChart = makeChart('current-chart', 'Current (A)', '#2ca02c');
+        // Chart instance for the power series.
         const powerChart = makeChart('power-chart', 'Power (W)', '#d62728');
 
         // Apply one day's rows to all three charts.
         function drawCharts(rows) {
+            // Time labels for the selected day's rows.
             const labels = rows.map(r => new Date(r.recorded_at * 1000).toLocaleTimeString());
+            // Chart and value pairs applied to each series.
             const datasets = [
                 [voltageChart, rows.map(r => r.voltage)],
                 [currentChart, rows.map(r => r.current)],
@@ -72,12 +78,17 @@
 
         // Keep the day picker in sync with the database.
         async function refreshDays() {
+            // Response from the available-days endpoint.
             const res = await fetch('/api/days');
+            // Available capture days returned by the API.
             const days = await res.json();
+            // Day picker element.
             const select = document.getElementById('day-select');
+            // Selected day before the option list is rebuilt.
             const keep = select.value;
             select.innerHTML = '';
             days.forEach(day => {
+                // Option element for one available day.
                 const option = document.createElement('option');
                 option.value = day;
                 option.textContent = day;
@@ -91,17 +102,21 @@
         // Refresh live cards, charts, and the log panel.
         async function refresh() {
             try {
+                // Most recent reading returned by the API.
                 const latest = await (await fetch('/api/latest')).json();
                 if (latest.voltage !== undefined) {
                     document.getElementById('v').textContent = latest.voltage;
                     document.getElementById('i').textContent = latest.current;
                     document.getElementById('p').textContent = latest.power;
                 }
+                // Selected day from the picker.
                 const day = await refreshDays();
                 if (day) {
+                    // Stored readings for the selected day.
                     const rows = await (await fetch('/api/readings?day=' + encodeURIComponent(day))).json();
                     drawCharts(rows);
                 }
+                // Recent event log lines.
                 const logs = await (await fetch('/api/logs?limit=30')).json();
                 document.getElementById('log-panel').textContent = logs.join('\n') || 'No events yet.';
             } catch (e) {
@@ -112,13 +127,16 @@
         // Save the manual angle and capture day used for future readings.
         document.getElementById('metadata-form').addEventListener('submit', async function (event) {
             event.preventDefault();
+            // Metadata payload sent to the API.
             const body = {
                 capture_date: document.getElementById('capture-date').value,
                 solar_angle: parseFloat(document.getElementById('solar-angle').value)
             };
+            // Response from the metadata save request.
             const res = await fetch('/api/metadata', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
             });
+            // Parsed metadata save response.
             const result = await res.json();
             document.getElementById('metadata-status').textContent = JSON.stringify(result);
             refresh();
