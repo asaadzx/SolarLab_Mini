@@ -16,3 +16,4 @@ services:
 
 volumes:
   solarlab-data:
+    name: solarlab-data

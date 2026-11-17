@@ -369,6 +369,7 @@ services:
 
 volumes:
   solarlab-data:
+    name: solarlab-data
 ```
 
 - [ ] **Step 5: Verify Compose syntax**
