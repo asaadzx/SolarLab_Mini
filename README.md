@@ -88,6 +88,24 @@ python receiver_http.py
 Both scripts read `http://192.168.4.1/data`, so the laptop must be on the
 `SolarLab-Mini` network.
 
+While the dashboard is open, it logs readings to
+`laptop_app/dashboard/data/solarlab.sqlite3` and writes rotating events/errors to
+`laptop_app/dashboard/data/app.log`. The page has a capture date/solar angle form,
+a day picker, three charts (voltage, current, power), a CSV download button, and a
+recent-events panel. The form tags future readings; CSV export is filtered by the
+selected day.
+
+| Route | Purpose |
+|---|---|
+| `/api/latest` | Live proxy of the ESP32's current reading (no storage). |
+| `/api/readings` | Stored readings for the selected day. |
+| `/api/days` | Available capture days for the day picker. |
+| `/api/metadata` | POST the capture date and solar angle for future readings. |
+| `/api/logs` | Recent log lines for the recent-events panel. |
+| `/export.csv` | Download the selected day's readings as CSV. |
+
+Docker packaging is planned as phase 2 and is not part of the current setup.
+
 ## Tests
 
 ```bash

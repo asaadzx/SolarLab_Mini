@@ -25,7 +25,8 @@ them to CSV. The MicroPython code in `firmware/` is the working implementation.
 | USB cable | Powers and programs the ESP32 during development; provides the serial console for debugging. |
 | `deploy.py` | Installs MicroPython, uploads `firmware/`, and resets the board. |
 | MicroPython firmware | `main.py` (loop), `config.py` (pins), `wifi_ap.py` (AP), `webserver.py` (JSON), and the two drivers. |
-| Flask dashboard | Browser page at `127.0.0.1:5000` that polls `/api/latest`, which proxies the ESP32's `/data`. |
+| Flask dashboard | Browser page at `127.0.0.1:5000` that polls `/api/latest`, which proxies the ESP32's `/data`, plus a capture date/solar angle form, a day picker, three charts (voltage, current, power), a CSV download button, and a recent-events panel. |
+| Dashboard storage | While the dashboard is open, a background poller saves readings to `laptop_app/dashboard/data/solarlab.sqlite3` and writes rotating events/errors to `laptop_app/dashboard/data/app.log`. Routes: `/api/readings`, `/api/days`, `/api/metadata`, `/api/logs`, `/export.csv`. |
 | CSV logger | `receiver_http.py` polls `/data` once per second and appends timestamped rows to `data/exports/`. |
 
 ## Wiring summary
@@ -61,8 +62,9 @@ The two devices are on **different I2C buses**; do not swap the pin pairs.
 | `firmware/drivers/` | Minimal `ina219.py` and `ssd1306.py` drivers. |
 | `laptop_app/` | Host-side scripts (CSV logger, requirements). |
 | `laptop_app/dashboard/` | Flask app that proxies sensor data for the browser. |
-| `laptop_app/dashboard/templates/` | `index.html` dashboard page with Chart.js graph. |
+| `laptop_app/dashboard/templates/` | `index.html` dashboard page with three Chart.js graphs. |
 | `laptop_app/dashboard/static/` | Dashboard stylesheet. |
+| `laptop_app/dashboard/data/` | Generated at runtime: `solarlab.sqlite3` readings and rotating `app.log`. |
 | `docs/` | Wiring guide and design documents. |
 | `docs/superpowers/specs/` | Design specs describing why changes were made. |
 | `docs/superpowers/plans/` | Step-by-step implementation plans. |
@@ -79,8 +81,16 @@ The two devices are on **different I2C buses**; do not swap the pin pairs.
 3. Join Wi-Fi `SolarLab-Mini` (password `solarlab123`) on your laptop or phone.
 4. Open `http://192.168.4.1/data` to see JSON, or check the OLED.
 5. On the laptop, run `python dashboard/app.py` from `laptop_app/` and open
-   `http://127.0.0.1:5000` for the live graph.
-6. Run `python -m pytest tests/ -q` from the repository root to check the code.
+   `http://127.0.0.1:5000` for the live dashboard. While the page is open, readings
+   are stored in `laptop_app/dashboard/data/solarlab.sqlite3` and events/errors in
+   the rotating `laptop_app/dashboard/data/app.log`.
+6. Set the capture date and solar angle in the form: this metadata tags future
+   readings only. Use the day picker to view the voltage, current, and power charts
+   for a stored day.
+7. Use the CSV download button to export the selected day's readings, and the
+   recent-events panel to see the latest log lines. Docker packaging is planned as
+   phase 2, so run the app directly with Python for now.
+8. Run `python -m pytest tests/ -q` from the repository root to check the code.
 
 ## Safety
 
