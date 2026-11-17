@@ -1,6 +1,8 @@
 """Flask dashboard with stored readings, metadata, CSV export, and logs."""
 
 import logging  # Application event/error logging
+import os  # Read environment-variable overrides
+import sys  # Stream log events to stdout for Docker
 import threading  # Protect shared metadata and poller startup
 from datetime import date  # Default capture day
 from logging.handlers import RotatingFileHandler  # Rotating log file
@@ -12,14 +14,16 @@ import requests  # Live proxy to the ESP32
 from poller import start_poller  # Background logger thread
 from storage import export_day_csv, get_days, get_readings, init_db  # Database helpers
 
-ESP_URL = "http://192.168.4.1/data"  # ESP32 JSON endpoint
+ESP_URL = os.getenv("ESP_URL", "http://192.168.4.1/data")  # ESP32 JSON endpoint
 BASE_DIR = Path(__file__).resolve().parent  # Folder containing this app
-DATA_DIR = BASE_DIR / "data"  # Folder for DB and log files
-DB_PATH = DATA_DIR / "solarlab.sqlite3"  # SQLite database file
-LOG_PATH = DATA_DIR / "app.log"  # Rotating application log file
+DATA_DIR = BASE_DIR / "data"  # Default folder for DB and log files
+DB_PATH = Path(os.getenv("SOLARLAB_DB_PATH", str(DATA_DIR / "solarlab.sqlite3")))  # SQLite DB file
+LOG_PATH = Path(os.getenv("SOLARLAB_LOG_PATH", str(DATA_DIR / "app.log")))  # Rotating log file
+HOST = os.getenv("HOST", "127.0.0.1")  # Bind address used by the dev server
+PORT = int(os.getenv("PORT", "5000"))  # Bind port used by the dev server
 
 app = Flask(__name__)  # Flask application object
-DATA_DIR.mkdir(parents=True, exist_ok=True)  # Create data folder on startup
+DATA_DIR.mkdir(parents=True, exist_ok=True)  # Create default data folder on startup
 metadata = {"capture_date": date.today().isoformat(), "solar_angle": 0.0}  # Current tags
 metadata_lock = threading.Lock()  # Guards metadata reads/writes
 _poller_started = False  # Prevents duplicate poller threads
@@ -28,12 +32,17 @@ stop_event = threading.Event()  # Signals the poller to stop
 
 logger = logging.getLogger("solarlab.dashboard")  # Named application logger
 logger.setLevel(logging.INFO)  # Record info and above
-if not logger.handlers:  # Configure file logging only once
-    handler = RotatingFileHandler(  # Keeps logs bounded in size
+if not logger.handlers:  # Configure handlers only once
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)  # Ensure the log folder exists
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")  # Shared log format
+    file_handler = RotatingFileHandler(  # Keeps logs bounded in size
         str(LOG_PATH), maxBytes=1_000_000, backupCount=3  # 1 MB x 4 files
     )
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    logger.addHandler(handler)  # Attach the rotating file handler
+    file_handler.setFormatter(formatter)  # Apply shared format to file logs
+    logger.addHandler(file_handler)  # Attach the rotating file handler
+    stream_handler = logging.StreamHandler(sys.stdout)  # Send events to Docker logs
+    stream_handler.setFormatter(formatter)  # Apply shared format to stdout logs
+    logger.addHandler(stream_handler)  # Attach the stdout handler
 
 init_db(DB_PATH)  # Ensure the table exists before any request
 
@@ -133,4 +142,4 @@ def export_csv():
 
 if __name__ == "__main__":  # Only run when invoked as a script
     logger.info("starting SolarLab Mini dashboard")  # Startup event
-    app.run(host="127.0.0.1", port=5000, debug=True)  # Local development server
+    app.run(host=HOST, port=PORT, debug=False)  # Local/container dev server
