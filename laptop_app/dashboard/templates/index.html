@@ -13,30 +13,120 @@
         <div class="card">Current: <span id="i">-</span> A</div>
         <div class="card">Power: <span id="p">-</span> W</div>
     </div>
-    <canvas id="chart" width="400" height="200"></canvas>
+    <div class="panel">
+        <h2>Capture metadata</h2>
+        <form id="metadata-form">
+            <label for="capture-date">Capture day</label>
+            <input type="date" id="capture-date" name="capture_date">
+            <label for="solar-angle">Solar angle (degrees)</label>
+            <input type="number" id="solar-angle" name="solar_angle" step="any" value="0">
+            <button type="submit">Save metadata</button>
+        </form>
+        <p id="metadata-status"></p>
+    </div>
+    <div class="panel">
+        <h2>Stored readings</h2>
+        <label for="day-select">Day</label>
+        <select id="day-select"></select>
+        <a id="download-csv" href="/export.csv" download>Download CSV</a>
+    </div>
+    <div class="chart-card"><h2>Voltage</h2><canvas id="voltage-chart"></canvas></div>
+    <div class="chart-card"><h2>Current</h2><canvas id="current-chart"></canvas></div>
+    <div class="chart-card"><h2>Power</h2><canvas id="power-chart"></canvas></div>
+    <div class="panel">
+        <h2>Recent events</h2>
+        <pre id="log-panel">Loading logs...</pre>
+    </div>
     <script>
-        const ctx = document.getElementById('chart');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'Power (W)', data: [], borderWidth: 1 }] },
-            options: { scales: { y: { beginAtZero: true } } }
-        });
-        async function update() {
-            try {
-                const res = await fetch('/api/latest');
-                const j = await res.json();
-                document.getElementById('v').textContent = j.voltage;
-                document.getElementById('i').textContent = j.current;
-                document.getElementById('p').textContent = j.power;
-                const t = new Date().toLocaleTimeString();
-                chart.data.labels.push(t);
-                chart.data.datasets[0].data.push(j.power);
-                if (chart.data.labels.length > 60) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-                chart.update();
-            } catch(e) {}
+        // Each chart is created once and updated with fresh rows every second.
+        function makeChart(canvasId, label, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{ label: label, data: [], borderColor: color, borderWidth: 2, pointRadius: 1, fill: false }]
+                },
+                options: { scales: { x: { ticks: { maxTicksLimit: 10 } }, y: { beginAtZero: true } }, animation: false }
+            });
         }
-        setInterval(update, 1000);
-        update();
+
+        const voltageChart = makeChart('voltage-chart', 'Voltage (V)', '#1f77b4');
+        const currentChart = makeChart('current-chart', 'Current (A)', '#2ca02c');
+        const powerChart = makeChart('power-chart', 'Power (W)', '#d62728');
+
+        // Apply one day's rows to all three charts.
+        function drawCharts(rows) {
+            const labels = rows.map(r => new Date(r.recorded_at * 1000).toLocaleTimeString());
+            const datasets = [
+                [voltageChart, rows.map(r => r.voltage)],
+                [currentChart, rows.map(r => r.current)],
+                [powerChart, rows.map(r => r.power)]
+            ];
+            datasets.forEach(([chart, values]) => {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = values;
+                chart.update();
+            });
+        }
+
+        // Keep the day picker in sync with the database.
+        async function refreshDays() {
+            const res = await fetch('/api/days');
+            const days = await res.json();
+            const select = document.getElementById('day-select');
+            const keep = select.value;
+            select.innerHTML = '';
+            days.forEach(day => {
+                const option = document.createElement('option');
+                option.value = day;
+                option.textContent = day;
+                select.appendChild(option);
+            });
+            if (days.includes(keep)) { select.value = keep; }
+            document.getElementById('download-csv').href = '/export.csv?day=' + encodeURIComponent(select.value);
+            return select.value;
+        }
+
+        // Refresh live cards, charts, and the log panel.
+        async function refresh() {
+            try {
+                const latest = await (await fetch('/api/latest')).json();
+                if (latest.voltage !== undefined) {
+                    document.getElementById('v').textContent = latest.voltage;
+                    document.getElementById('i').textContent = latest.current;
+                    document.getElementById('p').textContent = latest.power;
+                }
+                const day = await refreshDays();
+                if (day) {
+                    const rows = await (await fetch('/api/readings?day=' + encodeURIComponent(day))).json();
+                    drawCharts(rows);
+                }
+                const logs = await (await fetch('/api/logs?limit=30')).json();
+                document.getElementById('log-panel').textContent = logs.join('\n') || 'No events yet.';
+            } catch (e) {
+                document.getElementById('log-panel').textContent = 'Dashboard error: ' + e;
+            }
+        }
+
+        // Save the manual angle and capture day used for future readings.
+        document.getElementById('metadata-form').addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const body = {
+                capture_date: document.getElementById('capture-date').value,
+                solar_angle: parseFloat(document.getElementById('solar-angle').value)
+            };
+            const res = await fetch('/api/metadata', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+            const result = await res.json();
+            document.getElementById('metadata-status').textContent = JSON.stringify(result);
+            refresh();
+        });
+
+        document.getElementById('day-select').addEventListener('change', refresh);
+        setInterval(refresh, 1000);
+        refresh();
     </script>
 </body>
 </html>
