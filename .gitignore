@@ -17,3 +17,6 @@ test_wifi/.pio/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Local git worktrees
+.worktrees/
