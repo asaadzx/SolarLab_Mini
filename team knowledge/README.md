@@ -28,6 +28,7 @@ them to CSV. The MicroPython code in `firmware/` is the working implementation.
 | Flask dashboard | Browser page at `127.0.0.1:5000` that polls `/api/latest`, which proxies the ESP32's `/data`, plus a capture date/solar angle form, a day picker, three charts (voltage, current, power), a CSV download button, and a recent-events panel. |
 | Dashboard storage | While the dashboard is open, a background poller saves readings to `laptop_app/dashboard/data/solarlab.sqlite3` and writes rotating events/errors to `laptop_app/dashboard/data/app.log`. Routes: `/api/readings`, `/api/days`, `/api/metadata`, `/api/logs`, `/export.csv`. |
 | CSV logger | `receiver_http.py` polls `/data` once per second and appends timestamped rows to `data/exports/`. |
+| Docker dashboard | Minimal `python:3.12-slim` image and Compose service with host networking, a non-root user, stdout logging, and the `solarlab-data` named volume. |
 
 ## Wiring summary
 
@@ -88,8 +89,10 @@ The two devices are on **different I2C buses**; do not swap the pin pairs.
    readings only. Use the day picker to view the voltage, current, and power charts
    for a stored day.
 7. Use the CSV download button to export the selected day's readings, and the
-   recent-events panel to see the latest log lines. Docker packaging is planned as
-   phase 2, so run the app directly with Python for now.
+   recent-events panel to see the latest log lines. To run in Docker instead of
+   directly with Python, join `SolarLab-Mini`, then run `docker compose build`
+   and `docker compose up -d`; open `http://127.0.0.1:5000`. SQLite and logs are
+   stored in the `solarlab-data` named volume and survive `docker compose down`.
 8. Run `python -m pytest tests/ -q` from the repository root to check the code.
 
 ## Safety

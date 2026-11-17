@@ -104,7 +104,30 @@ selected day.
 | `/api/logs` | Recent log lines for the recent-events panel. |
 | `/export.csv` | Download the selected day's readings as CSV. |
 
-Docker packaging is planned as phase 2 and is not part of the current setup.
+## Docker (host networking)
+
+The dashboard can run as a minimal container. The laptop must be joined to
+`SolarLab-Mini` so the container can reach `192.168.4.1/data` through host
+networking; there is no `ports:` mapping.
+
+```bash
+docker compose build
+docker compose up -d
+# Open http://127.0.0.1:5000
+docker compose logs -f dashboard
+docker compose down
+```
+
+SQLite and rotating logs live in the `solarlab-data` named volume at
+`/app/data`. `docker compose down` preserves it. To back it up:
+
+```bash
+docker run --rm -v solarlab-data:/data -v "$PWD":/backup alpine \
+  tar czf /backup/solarlab-data-backup.tgz -C /data .
+```
+
+For testing without the board, set `ESP_URL` before `docker compose up`, for
+example `ESP_URL=http://127.0.0.1:18765/data docker compose up -d`.
 
 ## Tests
 
