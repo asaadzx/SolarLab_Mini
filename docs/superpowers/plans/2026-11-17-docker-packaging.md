@@ -139,7 +139,6 @@ HOST = os.getenv("HOST", "127.0.0.1")  # Bind address used by the dev server
 PORT = int(os.getenv("PORT", "5000"))  # Bind port used by the dev server
 
 app = Flask(__name__)  # Flask application object
-DATA_DIR.mkdir(parents=True, exist_ok=True)  # Create default data folder on startup
 metadata = {"capture_date": date.today().isoformat(), "solar_angle": 0.0}  # Current tags
 metadata_lock = threading.Lock()  # Guards metadata reads/writes
 _poller_started = False  # Prevents duplicate poller threads
